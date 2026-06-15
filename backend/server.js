@@ -7,7 +7,9 @@ import {
   addEntry,
   resetStory,
   MAX_PARTICIPANTS,
-  MAX_CHARS_PER_STORY
+  MAX_CHARS_PER_STORY,
+  getPresetCoverColors,
+  getPresetEmojis
 } from './storage.js';
 
 const app = express();
@@ -18,7 +20,9 @@ app.use(express.json({ limit: '1mb' }));
 app.get('/api/config', (_req, res) => {
   res.json({
     maxParticipants: MAX_PARTICIPANTS,
-    maxCharsPerStory: MAX_CHARS_PER_STORY
+    maxCharsPerStory: MAX_CHARS_PER_STORY,
+    coverColors: getPresetCoverColors(),
+    emojis: getPresetEmojis()
   });
 });
 
@@ -47,7 +51,7 @@ app.get('/api/stories/:id', (req, res) => {
 
 app.post('/api/stories', (req, res) => {
   try {
-    const { title, content, author } = req.body || {};
+    const { title, content, author, coverColor, emoji } = req.body || {};
     if (!title || !title.trim()) {
       return res.status(400).json({ error: '故事标题不能为空' });
     }
@@ -63,7 +67,9 @@ app.post('/api/stories', (req, res) => {
     const story = createStory({
       title: title.trim(),
       content: content.trim(),
-      author: author.trim()
+      author: author.trim(),
+      coverColor: coverColor || undefined,
+      emoji: emoji || undefined
     });
     res.status(201).json(story);
   } catch (err) {
