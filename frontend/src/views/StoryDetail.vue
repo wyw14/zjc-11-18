@@ -141,6 +141,41 @@ const continueForm = reactive({
   content: ''
 })
 
+const PRESET_COLORS = [
+  '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+  '#DDA0DD', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9',
+  '#F8B500', '#52BE80'
+]
+const PRESET_EMOJIS = [
+  '📖', '✨', '🌟', '🎭', '🏰', '🌈', '🦄', '🌙', '☀️', '🌸',
+  '🎨', '🎪', '🚀', '🗺️', '🔮', '🎵', '❤️', '🔥', '💎', '🌊'
+]
+const DEFAULT_COVER_COLOR = '#85C1E9'
+const DEFAULT_EMOJI = '📖'
+
+function hashString(str) {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash
+  }
+  return Math.abs(hash)
+}
+
+function normalizeStory(rawStory) {
+  if (!rawStory) return null
+  let coverColor = rawStory.coverColor
+  let emoji = rawStory.emoji
+  if (!coverColor || !emoji) {
+    const seed = rawStory.id || rawStory.title || String(Date.now())
+    const hash = hashString(seed)
+    if (!coverColor) coverColor = PRESET_COLORS[hash % PRESET_COLORS.length] || DEFAULT_COVER_COLOR
+    if (!emoji) emoji = PRESET_EMOJIS[hash % PRESET_EMOJIS.length] || DEFAULT_EMOJI
+  }
+  return { ...rawStory, coverColor, emoji }
+}
+
 const canContinue = computed(() => {
   return story.value && story.value.entries.length < maxParticipants.value
 })
@@ -183,7 +218,8 @@ async function fetchStory() {
   try {
     const res = await fetch(`/api/stories/${route.params.id}`)
     if (res.ok) {
-      story.value = await res.json()
+      const data = await res.json()
+      story.value = normalizeStory(data)
     } else {
       story.value = null
     }
@@ -223,7 +259,7 @@ async function handleContinue() {
     })
     const data = await res.json()
     if (res.ok) {
-      story.value = data
+      story.value = normalizeStory(data)
       continueForm.content = ''
       errorMsg.value = ''
     } else {

@@ -55,14 +55,57 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 
+const DEFAULT_COVER_COLOR = '#85C1E9'
+const DEFAULT_EMOJI = '📖'
+
+function hashString(str) {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash
+  }
+  return Math.abs(hash)
+}
+
+function normalizeStory(story, coverColors, emojis) {
+  let coverColor = story.coverColor
+  let emoji = story.emoji
+  if (!coverColor || !emoji) {
+    const colors = coverColors && coverColors.length ? coverColors : [DEFAULT_COVER_COLOR]
+    const icons = emojis && emojis.length ? emojis : [DEFAULT_EMOJI]
+    const seed = story.id || story.title || String(Date.now())
+    const hash = hashString(seed)
+    if (!coverColor) coverColor = colors[hash % colors.length]
+    if (!emoji) emoji = icons[hash % icons.length]
+  }
+  return { ...story, coverColor, emoji }
+}
+
 const stories = ref([])
+const coverColors = ref([])
+const emojis = ref([])
 const loading = ref(true)
+
+async function fetchConfig() {
+  try {
+    const res = await fetch('/api/config')
+    if (res.ok) {
+      const config = await res.json()
+      coverColors.value = config.coverColors || []
+      emojis.value = config.emojis || []
+    }
+  } catch (err) {
+    console.error('获取配置失败:', err)
+  }
+}
 
 async function fetchStories() {
   try {
     const res = await fetch('/api/stories')
     if (res.ok) {
-      stories.value = await res.json()
+      const list = await res.json()
+      stories.value = list.map(s => normalizeStory(s, coverColors.value, emojis.value))
     }
   } catch (err) {
     console.error('获取故事列表失败:', err)
@@ -71,8 +114,9 @@ async function fetchStories() {
   }
 }
 
-onMounted(() => {
-  fetchStories()
+onMounted(async () => {
+  await fetchConfig()
+  await fetchStories()
 })
 </script>
 

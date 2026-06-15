@@ -68,6 +68,32 @@ function generateId() {
   return 'story_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 }
 
+function hashString(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash);
+}
+
+function ensureCoverFields(story) {
+  const hasCoverColor = story.coverColor && PRESET_COVER_COLORS.includes(story.coverColor);
+  const hasEmoji = story.emoji && PRESET_EMOJIS.includes(story.emoji);
+  if (!hasCoverColor || !hasEmoji) {
+    const seed = story.id || story.title || String(Date.now());
+    const hash = hashString(seed);
+    if (!hasCoverColor) {
+      story.coverColor = PRESET_COVER_COLORS[hash % PRESET_COVER_COLORS.length];
+    }
+    if (!hasEmoji) {
+      story.emoji = PRESET_EMOJIS[hash % PRESET_EMOJIS.length];
+    }
+  }
+  return story;
+}
+
 function createStory({ title, content, author, coverColor, emoji }) {
   const data = readData();
   const story = {
@@ -93,22 +119,27 @@ function createStory({ title, content, author, coverColor, emoji }) {
 
 function getAllStories() {
   const data = readData();
-  return data.stories.map(story => ({
-    id: story.id,
-    title: story.title,
-    entriesCount: story.entries.length,
-    lastAuthor: story.entries[story.entries.length - 1].author,
-    coverColor: story.coverColor,
-    emoji: story.emoji,
-    createdAt: story.createdAt,
-    updatedAt: story.updatedAt,
-    preview: story.entries[0].content.substring(0, 100) + (story.entries[0].content.length > 100 ? '...' : '')
-  }));
+  return data.stories.map(story => {
+    const safeStory = ensureCoverFields({ ...story });
+    return {
+      id: safeStory.id,
+      title: safeStory.title,
+      entriesCount: safeStory.entries.length,
+      lastAuthor: safeStory.entries[safeStory.entries.length - 1].author,
+      coverColor: safeStory.coverColor,
+      emoji: safeStory.emoji,
+      createdAt: safeStory.createdAt,
+      updatedAt: safeStory.updatedAt,
+      preview: safeStory.entries[0].content.substring(0, 100) + (safeStory.entries[0].content.length > 100 ? '...' : '')
+    };
+  });
 }
 
 function getStoryById(id) {
   const data = readData();
-  return data.stories.find(s => s.id === id) || null;
+  const story = data.stories.find(s => s.id === id);
+  if (!story) return null;
+  return ensureCoverFields({ ...story });
 }
 
 function addEntry(storyId, { content, author }) {
